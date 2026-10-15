@@ -1,11 +1,10 @@
-# moonlink/moonlink
 ﻿# MoonLink
 
 MoonLink 是一个面向 Windows 10/11 x64 的局域网远程协助项目。第一期使用两个免安装应用：被控端选择一个显示器并明确允许连接；控制端输入地址和一次性验证码后获取远程画面及鼠标键盘控制。
 
 ## 当前状态
 
-项目处于实现初期。MoonBit 会话核心和可替换能力边界将先以自动化测试验证；Windows 采集、H.264 编解码、WebRTC 传输、D3D 查看窗口和真实两机性能尚未完成验证。不要将当前仓库视为可用远控工具。
+纯 MoonBit 核心和原生 C ABI 输入授权闸门已通过自动化测试。Windows 采集、H.264 编解码、WebRTC 传输、D3D 查看窗口和真实两机性能尚未完成验证。不要将当前仓库视为可用远控工具。
 
 ## 固定边界
 
@@ -25,3 +24,4 @@ MoonLink 是一个面向 Windows 10/11 x64 的局域网远程协助项目。第�
 - `docs/`：架构、FFI、威胁模型、测试和路线图。
 
 实施和验证入口见 [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)。
+第三方来源与许可证边界见 [THIRD_PARTY.md](THIRD_PARTY.md)。
