@@ -562,6 +562,31 @@ cleanup:
   return result;
 }
 
+HRESULT moonlink_native_create_mft_output_buffer(
+  const MFT_OUTPUT_STREAM_INFO *stream_info,
+  IMFMediaBuffer **buffer
+) {
+  if (stream_info == NULL || buffer == NULL) {
+    return E_POINTER;
+  }
+  *buffer = NULL;
+  if (stream_info->cbSize == 0) {
+    return E_INVALIDARG;
+  }
+  return MFCreateAlignedMemoryBuffer(
+    stream_info->cbSize,
+    stream_info->cbAlignment,
+    buffer
+  );
+}
+
+HRESULT moonlink_native_shutdown_activation(IMFActivate *activation) {
+  if (activation == NULL) {
+    return E_POINTER;
+  }
+  return IMFActivate_ShutdownObject(activation);
+}
+
 static int moonlink_native_h264_process_output(
   IMFTransform *transform,
   const MFT_OUTPUT_STREAM_INFO *stream_info
@@ -580,7 +605,10 @@ static int moonlink_native_h264_process_output(
     if (stream_info->cbSize == 0) {
       return -1;
     }
-    result = MFCreateMemoryBuffer(stream_info->cbSize, &caller_buffer);
+    result = moonlink_native_create_mft_output_buffer(
+      stream_info,
+      &caller_buffer
+    );
     if (FAILED(result)) {
       return -1;
     }
@@ -761,7 +789,13 @@ int moonlink_native_h264_software_encode_probe(void) {
       }
     }
     IMFTransform_ProcessMessage(transform, MFT_MESSAGE_NOTIFY_END_STREAMING, 0);
+    const HRESULT shutdown_result = moonlink_native_shutdown_activation(
+      activations[index]
+    );
     IMFTransform_Release(transform);
+    if (FAILED(shutdown_result)) {
+      encoded = 0;
+    }
   }
 
   for (UINT32 index = 0; index < activation_count; index += 1) {
