@@ -25,6 +25,15 @@ test "approval enables input and stop revokes it" {
 }
 
 ///|
+test "phase exposes the explicit state without mutation" {
+  let connected = admitted_request().approve()
+  match connected.phase() {
+    Connected => ()
+    _ => fail("connected session reported the wrong phase")
+  }
+}
+
+///|
 test "rejection ends the session without enabling input" {
   let rejected = admitted_request().reject()
   inspect(rejected.phase_name(), content="Ended")

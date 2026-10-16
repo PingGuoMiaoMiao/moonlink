@@ -87,6 +87,11 @@ pub fn Session::phase_name(self : Session) -> String {
 }
 
 ///|
+pub fn Session::phase(self : Session) -> SessionPhase {
+  self.phase
+}
+
+///|
 pub fn Session::accepts_input(self : Session) -> Bool {
   match self.phase {
     Connected | Degraded => true

@@ -19,6 +19,8 @@ MoonBit 仅看到不透明句柄、固定宽度数值、字节数组和受控回
 | `moonlink_native_h264_software_available` | 枚举并激活软件 H.264 Media Foundation 编码 MFT。 |
 | `moonlink_native_h264_hardware_available` | 枚举并激活硬件 H.264 Media Foundation 编码 MFT。 |
 
+`native/bridge_ffi.mbt` 是该头文件唯一的 MoonBit 封装：它以 `native/moon.pkg` 的 `native-stub` 构建 `src/bridge.c`，将 C 枚举映射为 `CaptureProbeResult` 和 `ViewerProbeResult`，将 H.264 探测映射为 `Bool`，并把 `core.SessionPhase` 显式转换为 C 会话状态。`core/` 不导入 `native/`，因此会话核心不依赖 Windows 类型或原生实现。
+
 `native/tests/transport_loopback.c` 直接使用固定版本 libdatachannel 的 C API 验证本机 WebRTC 协商，不属于该头文件的已导出会话 ABI，也尚未由 MoonBit 调用。
 
 该修订尚未暴露采集、编解码、传输、D3D 查看或遥测句柄。六类完整能力的句柄、回调线程和释放语义必须先由各自的可行性测试确定，再扩展此头文件和 MoonBit FFI 声明。

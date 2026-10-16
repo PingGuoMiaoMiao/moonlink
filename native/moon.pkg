@@ -1,0 +1,16 @@
+import {
+  "moonlink/moonlink/core",
+}
+
+supported_targets = "native"
+
+options(
+  "native-stub": [ "src/bridge.c" ],
+  link: {
+    "native": {
+      "cc-flags": "/I native/include",
+      "stub-cc-flags": "/I native/include",
+      "cc-link-flags": "user32.lib d3d11.lib dxgi.lib dxguid.lib mfplat.lib mf.lib mfuuid.lib ole32.lib",
+    },
+  },
+)
