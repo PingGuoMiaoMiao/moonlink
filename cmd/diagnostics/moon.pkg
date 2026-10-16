@@ -1,0 +1,15 @@
+import {
+  "moonlink/moonlink/native",
+}
+
+supported_targets = "native"
+
+pkgtype(kind: "executable")
+
+options(
+  link: {
+    "native": {
+      "cc-link-flags": "user32.lib d3d11.lib dxgi.lib dxguid.lib mfplat.lib mf.lib mfuuid.lib ole32.lib",
+    },
+  },
+)

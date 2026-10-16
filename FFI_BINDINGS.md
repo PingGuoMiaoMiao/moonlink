@@ -21,6 +21,8 @@ MoonBit 仅看到不透明句柄、固定宽度数值、字节数组和受控回
 
 `native/bridge_ffi.mbt` 是该头文件唯一的 MoonBit 封装：它以 `native/moon.pkg` 的 `native-stub` 构建 `src/bridge.c`，将 C 枚举映射为 `CaptureProbeResult` 和 `ViewerProbeResult`，将 H.264 探测映射为 `Bool`，并把 `core.SessionPhase` 显式转换为 C 会话状态。`core/` 不导入 `native/`，因此会话核心不依赖 Windows 类型或原生实现。
 
+MoonBit 不会把包的 `cc-link-flags` 自动传递给导入它的可执行包。因此每个导入 `native/` 的 Windows 可执行包必须在自身 `moon.pkg` 显式链接 `user32.lib d3d11.lib dxgi.lib dxguid.lib mfplat.lib mf.lib mfuuid.lib ole32.lib`。`cmd/diagnostics` 是这一规则的最小可运行验证。
+
 `native/tests/transport_loopback.c` 直接使用固定版本 libdatachannel 的 C API 验证本机 WebRTC 协商，不属于该头文件的已导出会话 ABI，也尚未由 MoonBit 调用。
 
 该修订尚未暴露采集、编解码、传输、D3D 查看或遥测句柄。六类完整能力的句柄、回调线程和释放语义必须先由各自的可行性测试确定，再扩展此头文件和 MoonBit FFI 声明。

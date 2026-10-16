@@ -6,6 +6,8 @@
 
 MoonBit 原生包测试会编译同一份 `native/src/bridge.c`，验证值型 FFI 可调用、C 探针结果被映射为 MoonBit 枚举、H.264 能力被映射为布尔值，以及 `core.SessionPhase` 到 C 输入闸门的转换。该测试不使 `core/` 依赖 `native/`。
 
+`moon run cmd/diagnostics --target native` 验证独立 MoonBit 可执行包能链接原生桥并调用 ABI、显示器、采集、查看与 H.264 探针。它只输出诊断状态，不启动共享、帧通路、网络传输或输入执行。
+
 固定版本 libdatachannel 的本机环回测试创建两个 `PeerConnection`、可靠控制数据通道 `moonlink-control` 和一个 H.264 `sendonly` 轨道；测试验证两端控制通道打开、接收端收到视频轨道协商，并收到 12 字节 `control-ping`。该测试不发送 H.264 帧，因此不是媒体编码、解码或 60fps 性能结论。
 
 端到端验收仅在两台实体 Windows 10/11 x64、千兆有线网络和硬件 H.264 可用时评估。拥塞时优先降低码率和帧率，保留控制响应。

@@ -8,6 +8,16 @@ MoonLink 是一个面向 Windows 10/11 x64 的局域网远程协助项目。第�
 
 尚未实现连续桌面采集、720p H.264 帧编码与发送、远端解码和呈现、Windows 输入执行、Proton 两端界面或真实两机性能测量。不要将当前仓库视为可用远控工具。
 
+## 原生诊断
+
+在 Windows x64 原生目标上运行只读探针：
+
+```powershell
+moon run cmd/diagnostics --target native
+```
+
+该命令不会共享桌面、建立网络连接或执行远程输入。
+
 ## 固定边界
 
 - 平台：Windows 10/11 x64。
