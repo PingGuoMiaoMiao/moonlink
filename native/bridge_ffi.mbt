@@ -8,6 +8,9 @@ extern "C" fn native_display_count_ffi() -> Int = "moonlink_native_display_count
 extern "C" fn native_desktop_duplication_probe_result_ffi() -> Int = "moonlink_native_desktop_duplication_probe"
 
 ///|
+extern "C" fn native_desktop_frame_acquire_probe_result_ffi() -> Int = "moonlink_native_desktop_frame_acquire_probe"
+
+///|
 extern "C" fn native_d3d_viewer_probe_result_ffi() -> Int = "moonlink_native_d3d_viewer_probe"
 
 ///|
@@ -26,6 +29,7 @@ pub(all) enum CaptureProbeResult {
   CaptureAdapterUnavailable
   CaptureOutputUnavailable
   CaptureDuplicationUnavailable
+  CaptureFrameUnavailable
 }
 
 ///|
@@ -58,7 +62,22 @@ pub fn native_desktop_duplication_probe() -> CaptureProbeResult {
     2 => CaptureAdapterUnavailable
     3 => CaptureOutputUnavailable
     4 => CaptureDuplicationUnavailable
+    5 => CaptureFrameUnavailable
     _ => abort("unexpected native desktop-duplication probe result")
+  }
+}
+
+///|
+/// Returns the result of acquiring and releasing one desktop frame.
+pub fn native_desktop_frame_acquire_probe() -> CaptureProbeResult {
+  match native_desktop_frame_acquire_probe_result_ffi() {
+    0 => CaptureReady
+    1 => CaptureDeviceUnavailable
+    2 => CaptureAdapterUnavailable
+    3 => CaptureOutputUnavailable
+    4 => CaptureDuplicationUnavailable
+    5 => CaptureFrameUnavailable
+    _ => abort("unexpected native desktop-frame probe result")
   }
 }
 

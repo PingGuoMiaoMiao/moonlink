@@ -18,6 +18,7 @@ typedef enum moonlink_native_capture_probe_result {
   MOONLINK_NATIVE_CAPTURE_ADAPTER_UNAVAILABLE = 2,
   MOONLINK_NATIVE_CAPTURE_OUTPUT_UNAVAILABLE = 3,
   MOONLINK_NATIVE_CAPTURE_DUPLICATION_UNAVAILABLE = 4,
+  MOONLINK_NATIVE_CAPTURE_FRAME_UNAVAILABLE = 5,
 } moonlink_native_capture_probe_result;
 
 typedef enum moonlink_native_viewer_probe_result {
@@ -31,6 +32,9 @@ typedef enum moonlink_native_viewer_probe_result {
 int moonlink_native_bridge_abi_version(void);
 int moonlink_native_display_count(void);
 moonlink_native_capture_probe_result moonlink_native_desktop_duplication_probe(
+  void
+);
+moonlink_native_capture_probe_result moonlink_native_desktop_frame_acquire_probe(
   void
 );
 moonlink_native_viewer_probe_result moonlink_native_d3d_viewer_probe(void);

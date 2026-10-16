@@ -12,6 +12,10 @@ int main(void) {
     moonlink_native_desktop_duplication_probe() ==
     MOONLINK_NATIVE_CAPTURE_READY
   );
+  assert(
+    moonlink_native_desktop_frame_acquire_probe() ==
+    MOONLINK_NATIVE_CAPTURE_READY
+  );
   assert(moonlink_native_d3d_viewer_probe() == MOONLINK_NATIVE_VIEWER_READY);
   assert(moonlink_native_h264_software_available() == 1);
   assert(h264_hardware_available >= 0);

@@ -15,6 +15,7 @@ MoonBit 仅看到不透明句柄、固定宽度数值、字节数组和受控回
 | `moonlink_native_input_allowed` | 仅 `MOONLINK_NATIVE_CONNECTED` 与 `MOONLINK_NATIVE_DEGRADED` 返回允许值；等待确认和结束状态不可执行输入。 |
 | `moonlink_native_display_count` | 通过 `EnumDisplayMonitors` 统计可见显示器。 |
 | `moonlink_native_desktop_duplication_probe` | 创建硬件 D3D11 设备，对第一个 DXGI 输出调用 `IDXGIOutput1::DuplicateOutput` 后立即释放。它不采集或保存帧。 |
+| `moonlink_native_desktop_frame_acquire_probe` | 对第一个 DXGI 输出获取一帧、释放 `IDXGIResource` 和 `IDXGIOutputDuplication` 帧后返回。它不保存、编码、显示或发送像素。 |
 | `moonlink_native_d3d_viewer_probe` | 创建 1×1 原生窗口与 D3D11 交换链，清屏并 `Present` 后销毁。它不接收或呈现 H.264 帧。 |
 | `moonlink_native_h264_software_available` | 枚举并激活软件 H.264 Media Foundation 编码 MFT。 |
 | `moonlink_native_h264_hardware_available` | 枚举并激活硬件 H.264 Media Foundation 编码 MFT。 |

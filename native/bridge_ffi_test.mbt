@@ -5,7 +5,8 @@ fn capture_probe_result_is_known(result : CaptureProbeResult) -> Bool {
     | CaptureDeviceUnavailable
     | CaptureAdapterUnavailable
     | CaptureOutputUnavailable
-    | CaptureDuplicationUnavailable => true
+    | CaptureDuplicationUnavailable
+    | CaptureFrameUnavailable => true
   }
 }
 
@@ -26,6 +27,10 @@ test "native bridge ABI and input guard are callable from MoonBit" {
   inspect(native_display_count() >= 0, content="true")
   inspect(
     capture_probe_result_is_known(native_desktop_duplication_probe()),
+    content="true",
+  )
+  inspect(
+    capture_probe_result_is_known(native_desktop_frame_acquire_probe()),
     content="true",
   )
   inspect(

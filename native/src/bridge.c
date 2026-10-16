@@ -34,8 +34,8 @@ int moonlink_native_display_count(void) {
   return count;
 }
 
-moonlink_native_capture_probe_result moonlink_native_desktop_duplication_probe(
-  void
+static moonlink_native_capture_probe_result moonlink_native_desktop_probe(
+  BOOL acquire_frame
 ) {
   ID3D11Device *device = NULL;
   ID3D11DeviceContext *device_context = NULL;
@@ -114,6 +114,50 @@ moonlink_native_capture_probe_result moonlink_native_desktop_duplication_probe(
     return MOONLINK_NATIVE_CAPTURE_DUPLICATION_UNAVAILABLE;
   }
 
+  if (acquire_frame) {
+    DXGI_OUTDUPL_FRAME_INFO frame_info = { 0 };
+    IDXGIResource *desktop_resource = NULL;
+    result = IDXGIOutputDuplication_AcquireNextFrame(
+      duplication,
+      1000,
+      &frame_info,
+      &desktop_resource
+    );
+    if (FAILED(result)) {
+      IDXGIOutputDuplication_Release(duplication);
+      IDXGIOutput1_Release(output1);
+      IDXGIOutput_Release(output);
+      IDXGIAdapter_Release(adapter);
+      IDXGIDevice_Release(dxgi_device);
+      ID3D11DeviceContext_Release(device_context);
+      ID3D11Device_Release(device);
+      return MOONLINK_NATIVE_CAPTURE_FRAME_UNAVAILABLE;
+    }
+    if (desktop_resource == NULL) {
+      IDXGIOutputDuplication_ReleaseFrame(duplication);
+      IDXGIOutputDuplication_Release(duplication);
+      IDXGIOutput1_Release(output1);
+      IDXGIOutput_Release(output);
+      IDXGIAdapter_Release(adapter);
+      IDXGIDevice_Release(dxgi_device);
+      ID3D11DeviceContext_Release(device_context);
+      ID3D11Device_Release(device);
+      return MOONLINK_NATIVE_CAPTURE_FRAME_UNAVAILABLE;
+    }
+    IDXGIResource_Release(desktop_resource);
+    result = IDXGIOutputDuplication_ReleaseFrame(duplication);
+    if (FAILED(result)) {
+      IDXGIOutputDuplication_Release(duplication);
+      IDXGIOutput1_Release(output1);
+      IDXGIOutput_Release(output);
+      IDXGIAdapter_Release(adapter);
+      IDXGIDevice_Release(dxgi_device);
+      ID3D11DeviceContext_Release(device_context);
+      ID3D11Device_Release(device);
+      return MOONLINK_NATIVE_CAPTURE_FRAME_UNAVAILABLE;
+    }
+  }
+
   IDXGIOutputDuplication_Release(duplication);
   IDXGIOutput1_Release(output1);
   IDXGIOutput_Release(output);
@@ -122,6 +166,18 @@ moonlink_native_capture_probe_result moonlink_native_desktop_duplication_probe(
   ID3D11DeviceContext_Release(device_context);
   ID3D11Device_Release(device);
   return MOONLINK_NATIVE_CAPTURE_READY;
+}
+
+moonlink_native_capture_probe_result moonlink_native_desktop_duplication_probe(
+  void
+) {
+  return moonlink_native_desktop_probe(FALSE);
+}
+
+moonlink_native_capture_probe_result moonlink_native_desktop_frame_acquire_probe(
+  void
+) {
+  return moonlink_native_desktop_probe(TRUE);
 }
 
 moonlink_native_viewer_probe_result moonlink_native_d3d_viewer_probe(void) {

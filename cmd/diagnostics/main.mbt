@@ -29,11 +29,14 @@ fn main {
   let capture_ready = capture_probe_ready(
     @native.native_desktop_duplication_probe(),
   )
+  let frame_acquire_ready = capture_probe_ready(
+    @native.native_desktop_frame_acquire_probe(),
+  )
   let viewer_ready = viewer_probe_ready(@native.native_d3d_viewer_probe())
   let software_h264 = @native.native_h264_software_available()
   let hardware_h264 = @native.native_h264_hardware_available()
 
-  if !capture_ready || !viewer_ready || !software_h264 {
+  if !capture_ready || !frame_acquire_ready || !viewer_ready || !software_h264 {
     println("MoonLink native diagnostics: a required probe is unavailable")
     return
   }
