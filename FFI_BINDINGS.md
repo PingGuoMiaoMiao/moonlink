@@ -8,7 +8,18 @@ MoonBit 仅看到不透明句柄、固定宽度数值、字节数组和受控回
 
 ## 当前 ABI：修订 1
 
-`native/include/moonlink_native_bridge.h` 是当前唯一已实现的 C 头文件。它定义了 `moonlink_native_session_state`、`moonlink_native_bridge_abi_version` 和 `moonlink_native_input_allowed`。后者只对 `MOONLINK_NATIVE_CONNECTED` 与 `MOONLINK_NATIVE_DEGRADED` 返回允许值；等待确认和结束状态均不可执行输入。
+`native/include/moonlink_native_bridge.h` 是当前唯一已实现的 C 头文件。它定义了 `moonlink_native_session_state`、`moonlink_native_bridge_abi_version` 和下列输入闸门与可行性探针；这些探针均为无状态调用，不创建可供 MoonBit 持有的会话资源。
+
+| 符号 | 已验证的边界 |
+| --- | --- |
+| `moonlink_native_input_allowed` | 仅 `MOONLINK_NATIVE_CONNECTED` 与 `MOONLINK_NATIVE_DEGRADED` 返回允许值；等待确认和结束状态不可执行输入。 |
+| `moonlink_native_display_count` | 通过 `EnumDisplayMonitors` 统计可见显示器。 |
+| `moonlink_native_desktop_duplication_probe` | 创建硬件 D3D11 设备，对第一个 DXGI 输出调用 `IDXGIOutput1::DuplicateOutput` 后立即释放。它不采集或保存帧。 |
+| `moonlink_native_d3d_viewer_probe` | 创建 1×1 原生窗口与 D3D11 交换链，清屏并 `Present` 后销毁。它不接收或呈现 H.264 帧。 |
+| `moonlink_native_h264_software_available` | 枚举并激活软件 H.264 Media Foundation 编码 MFT。 |
+| `moonlink_native_h264_hardware_available` | 枚举并激活硬件 H.264 Media Foundation 编码 MFT。 |
+
+`native/tests/transport_loopback.c` 直接使用固定版本 libdatachannel 的 C API 验证本机 WebRTC 协商，不属于该头文件的已导出会话 ABI，也尚未由 MoonBit 调用。
 
 该修订尚未暴露采集、编解码、传输、D3D 查看或遥测句柄。六类完整能力的句柄、回调线程和释放语义必须先由各自的可行性测试确定，再扩展此头文件和 MoonBit FFI 声明。
 
