@@ -18,6 +18,7 @@ int main(void) {
   );
   assert(moonlink_native_d3d_viewer_probe() == MOONLINK_NATIVE_VIEWER_READY);
   assert(moonlink_native_h264_software_available() == 1);
+  assert(moonlink_native_h264_software_encode_probe() == 1);
   assert(h264_hardware_available >= 0);
   assert(h264_hardware_available <= 1);
   assert(moonlink_native_input_allowed(MOONLINK_NATIVE_AWAITING_APPROVAL) == 0);

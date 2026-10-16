@@ -39,6 +39,7 @@ moonlink_native_capture_probe_result moonlink_native_desktop_frame_acquire_probe
 );
 moonlink_native_viewer_probe_result moonlink_native_d3d_viewer_probe(void);
 int moonlink_native_h264_software_available(void);
+int moonlink_native_h264_software_encode_probe(void);
 int moonlink_native_h264_hardware_available(void);
 int moonlink_native_input_allowed(moonlink_native_session_state state);
 

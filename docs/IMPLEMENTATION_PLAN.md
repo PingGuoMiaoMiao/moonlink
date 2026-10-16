@@ -3,7 +3,7 @@
 本计划以 `ARCHITECTURE.md`、`FFI_BINDINGS.md`、`SECURITY.md` 和 `TEST_PLAN.md` 为准。
 
 1. 建立纯 MoonBit 核心及自动化测试。
-2. 建立独立 CMake 原生桥和逐项可行性探针。第一轮探针与值型 MoonBit FFI 已通过；下一步是连续采集、实际编解码与会话句柄，不得将对象创建、轨道协商视作帧通路交付。
+2. 建立独立 CMake 原生桥和逐项可行性探针。第一轮探针、值型 MoonBit FFI 与软件 H.264 合成 NV12 样本编码已通过；下一步是连续采集、将 Desktop Duplication 帧交给编解码路径与会话句柄，不得将对象创建、合成样本编码或轨道协商视作帧通路交付。
 3. 接入 Proton 双端界面和原生查看窗口。
 4. 执行两机局域网性能验收。
 

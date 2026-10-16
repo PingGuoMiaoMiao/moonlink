@@ -18,6 +18,7 @@ MoonBit 仅看到不透明句柄、固定宽度数值、字节数组和受控回
 | `moonlink_native_desktop_frame_acquire_probe` | 对第一个 DXGI 输出获取一帧、释放 `IDXGIResource` 和 `IDXGIOutputDuplication` 帧后返回。它不保存、编码、显示或发送像素。 |
 | `moonlink_native_d3d_viewer_probe` | 创建 1×1 原生窗口与 D3D11 交换链，清屏并 `Present` 后销毁。它不接收或呈现 H.264 帧。 |
 | `moonlink_native_h264_software_available` | 枚举并激活软件 H.264 Media Foundation 编码 MFT。 |
+| `moonlink_native_h264_software_encode_probe` | 枚举同步软件 H.264 MFT，以 1280×720、30fps、2,000,000 bit/s 的 H.264 输出类型和 NV12 输入类型驱动最多四个合成样本；仅当收到非空输出样本时返回允许值，并释放全部样本与 MFT。它不编码桌面帧，也不保存或发送输出字节。 |
 | `moonlink_native_h264_hardware_available` | 枚举并激活硬件 H.264 Media Foundation 编码 MFT。 |
 
 `native/bridge_ffi.mbt` 是该头文件唯一的 MoonBit 封装：它以 `native/moon.pkg` 的 `native-stub` 构建 `src/bridge.c`，将 C 枚举映射为 `CaptureProbeResult` 和 `ViewerProbeResult`，将 H.264 探测映射为 `Bool`，并把 `core.SessionPhase` 显式转换为 C 会话状态。`core/` 不导入 `native/`，因此会话核心不依赖 Windows 类型或原生实现。

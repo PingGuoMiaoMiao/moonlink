@@ -34,16 +34,25 @@ fn main {
   )
   let viewer_ready = viewer_probe_ready(@native.native_d3d_viewer_probe())
   let software_h264 = @native.native_h264_software_available()
+  let software_h264_encoded = @native.native_h264_software_encode_probe()
   let hardware_h264 = @native.native_h264_hardware_available()
 
-  if !capture_ready || !frame_acquire_ready || !viewer_ready || !software_h264 {
+  if !capture_ready ||
+    !frame_acquire_ready ||
+    !viewer_ready ||
+    !software_h264 ||
+    !software_h264_encoded {
     println("MoonLink native diagnostics: a required probe is unavailable")
     return
   }
 
   if hardware_h264 {
-    println("MoonLink native diagnostics: hardware H.264 probe ready")
+    println(
+      "MoonLink native diagnostics: software H.264 encoding and hardware H.264 activation ready",
+    )
   } else {
-    println("MoonLink native diagnostics: software H.264 fallback ready")
+    println(
+      "MoonLink native diagnostics: software H.264 encoding fallback ready",
+    )
   }
 }

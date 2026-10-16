@@ -6,9 +6,9 @@
 
 ## 阶段 1：原生可行性
 
-已在一台 Windows x64 主机完成以下探针：显示器枚举；DXGI Desktop Duplication 对象创建与释放；一次桌面帧获取及释放；1×1 D3D11 交换链清屏和呈现；软件及硬件 H.264 Media Foundation 编码 MFT 的枚举和激活；libdatachannel 的本机控制通道与 H.264 轨道协商；输入状态闸门。值型原生探针已通过 `native/bridge_ffi.mbt` 接入 MoonBit，且会话核心保持不依赖原生包。`cmd/diagnostics` 已验证跨包链接和只读探针调用。
+已在一台 Windows x64 主机完成以下探针：显示器枚举；DXGI Desktop Duplication 对象创建与释放；一次桌面帧获取及释放；1×1 D3D11 交换链清屏和呈现；软件 H.264 Media Foundation 编码器以合成 1280×720 NV12 样本产出非空编码样本；软件及硬件 H.264 编码 MFT 的枚举和激活；libdatachannel 的本机控制通道与 H.264 轨道协商；输入状态闸门。值型原生探针已通过 `native/bridge_ffi.mbt` 接入 MoonBit，且会话核心保持不依赖原生包。`cmd/diagnostics` 已验证跨包链接和只读探针调用。
 
-本阶段尚未完成：连续桌面帧采集、720p 编码、实际 H.264 包发送、解码、远程 D3D 呈现、码率/帧率自适应和两机性能测量。因此尚不进入端到端性能承诺。
+本阶段尚未完成：连续桌面帧采集、将桌面帧交给编码器、实际 H.264 包发送、解码、远程 D3D 呈现、码率/帧率自适应和两机性能测量。因此尚不进入端到端性能承诺。
 
 ## 阶段 2：双端协助流程
 

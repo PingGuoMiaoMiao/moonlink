@@ -17,6 +17,9 @@ extern "C" fn native_d3d_viewer_probe_result_ffi() -> Int = "moonlink_native_d3d
 extern "C" fn native_h264_software_available_ffi() -> Int = "moonlink_native_h264_software_available"
 
 ///|
+extern "C" fn native_h264_software_encode_probe_ffi() -> Int = "moonlink_native_h264_software_encode_probe"
+
+///|
 extern "C" fn native_h264_hardware_available_ffi() -> Int = "moonlink_native_h264_hardware_available"
 
 ///|
@@ -98,6 +101,12 @@ pub fn native_d3d_viewer_probe() -> ViewerProbeResult {
 /// Reports whether Windows activated a software H.264 encoder MFT.
 pub fn native_h264_software_available() -> Bool {
   native_h264_software_available_ffi() == 1
+}
+
+///|
+/// Runs the software H.264 probe and reports whether it produced a nonempty sample.
+pub fn native_h264_software_encode_probe() -> Bool {
+  native_h264_software_encode_probe_ffi() == 1
 }
 
 ///|

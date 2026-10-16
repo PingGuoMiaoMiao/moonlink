@@ -39,8 +39,10 @@ test "native bridge ABI and input guard are callable from MoonBit" {
   )
 
   let software_available = native_h264_software_available()
+  let software_encoded = native_h264_software_encode_probe()
   let hardware_available = native_h264_hardware_available()
   inspect(software_available || !software_available, content="true")
+  inspect(software_encoded, content="true")
   inspect(hardware_available || !hardware_available, content="true")
 
   inspect(native_input_allowed(@core.Idle), content="false")
