@@ -2,11 +2,36 @@
 
 纯 MoonBit 测试覆盖会话状态、一次性验证码的错误/过期/单次消费、授权前置条件、等比留边坐标映射、过期鼠标事件、按键与鼠标按键的可靠有序类别、能力替换、降级状态和技术轨迹的类型级脱敏。
 
-原生桥当前测试覆盖 ABI 修订值、显示器枚举、未授权输入拒绝、桌面复制对象创建/释放、一次 Desktop Duplication 帧获取及释放、1×1 D3D11 清屏并呈现、软件 H.264 Media Foundation 编码器对合成 1280×720 NV12 样本的非空输出、调用方输出缓冲的 64 字节对齐，以及成功激活对象的 `ShutdownObject` 调用，以及软件与硬件 H.264 编码 MFT 的枚举和激活。它没有连续采集桌面帧、将 Desktop Duplication 帧交给编码器或解码/呈现远程 H.264 帧。
+### v1 探针测试（不变）
 
-MoonBit 原生包测试会编译同一份 `native/src/bridge.c`，验证值型 FFI 可调用、C 探针结果被映射为 MoonBit 枚举、H.264 能力被映射为布尔值，以及 `core.SessionPhase` 到 C 输入闸门的转换。该测试不使 `core/` 依赖 `native/`。
+原生桥测试覆盖 ABI 修订值（v2）、显示器枚举、未授权输入拒绝、桌面复制对象创建/释放、一次 Desktop Duplication 帧获取及释放、BGRA 纹理确认、1×1 D3D11 清屏并呈现、软件 H.264 编码器合成样本非空输出、64 字节对齐、`ShutdownObject` 调用，以及软件与硬件 H.264 MFT 枚举和激活。
 
-`moon run cmd/diagnostics --target native` 验证独立 MoonBit 可执行包能链接原生桥并调用 ABI、显示器、一次帧获取、查看与 H.264 探针。它只输出诊断状态；Desktop Duplication 帧在本机内存中被立即释放，H.264 探针使用独立的合成 NV12 样本，不启动共享、连续帧通路、网络传输或输入执行。
+### v2 会话句柄测试
+
+`bridge_tests.c` 新增了以下会话级验证：
+
+- **Capture**：创建采集会话（1280×720），获取一帧并验证宽高 > 0，复制 NV12 数据到调用方缓冲区并验证大小匹配，停止并销毁，二次销毁返回 `INVALID_HANDLE`。
+- **Encoder**：创建软件编码会话（1280×720@30fps, 2Mbps），停止并销毁。
+- **Decoder**：创建解码会话（1280×720），停止并销毁。
+- **Viewer**：创建 D3D11 查看器窗口（1280×720），泵送一次消息循环，停止并销毁。
+
+端到端管线串联测试（采集→编码→传输→解码→查看）尚未实现，待阶段 2 剩余工作完成后补充。
+
+### H.264 RTP 解包测试
+
+`depacketizer_tests.c` 覆盖接收侧唯一的内容解析环节，共 6 组用例：单 NAL 与 marker 位、STAP-A 聚合、FU-A 三分片重组、CSRC/扩展头/填充剥离、畸形输入（过短报文、FU-B、孤儿分片）拒绝，以及多 NAL 组成一个访问单元。
+
+### 编解码往返诊断
+
+`moonlink_decoder_roundtrip` 采集桌面、编码并逐包送入解码器，用于验证编码长度与解码启动契约。该程序当前不作为 CTest 用例：本机唯一的 H.264 解码器 MFT 是 DXVA 变体，未挂接 D3D11 设备管理器时解码 0 帧，属于阶段 2 未完成项而不是回归。
+
+### MoonBit FFI 测试
+
+`bridge_ffi_test.mbt` 验证 ABI v2 版本号、所有 v1 探针的 MoonBit 枚举映射、H.264 能力布尔映射，以及 `core.SessionPhase` 到 C 输入闸门的转换。该测试不使 `core/` 依赖 `native/`。
+
+### 诊断命令
+
+`moon run cmd/diagnostics --target native` 验证 ABI v2、显示器、帧获取、查看器和 H.264 探针。它只输出诊断状态，不启动连续帧通路、网络传输或输入执行。
 
 固定版本 libdatachannel 的本机环回测试创建两个 `PeerConnection`、可靠控制数据通道 `moonlink-control` 和一个 H.264 `sendonly` 轨道；测试验证两端控制通道打开、接收端收到视频轨道协商，并收到 12 字节 `control-ping`。该测试不发送 H.264 帧，因此不是媒体编码、解码或 60fps 性能结论。
 

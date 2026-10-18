@@ -1,14 +1,6 @@
-#include "moonlink_native_bridge.h"
+#include "sessions_internal.h"
 
-#define WIN32_LEAN_AND_MEAN
-#define COBJMACROS
-#include <windows.h>
-#include <d3d11.h>
-#include <dxgi1_2.h>
-#include <mfapi.h>
 #include <mferror.h>
-#include <mftransform.h>
-
 #include <string.h>
 
 enum {
@@ -49,7 +41,7 @@ static BOOL CALLBACK moonlink_count_display(
 }
 
 int moonlink_native_bridge_abi_version(void) {
-  return 1;
+  return MOONLINK_NATIVE_ABI_VERSION;
 }
 
 int moonlink_native_display_count(void) {
@@ -61,7 +53,8 @@ int moonlink_native_display_count(void) {
 }
 
 static moonlink_native_capture_probe_result moonlink_native_desktop_probe(
-  BOOL acquire_frame
+  BOOL acquire_frame,
+  BOOL inspect_texture
 ) {
   ID3D11Device *device = NULL;
   ID3D11DeviceContext *device_context = NULL;
@@ -170,9 +163,32 @@ static moonlink_native_capture_probe_result moonlink_native_desktop_probe(
       ID3D11Device_Release(device);
       return MOONLINK_NATIVE_CAPTURE_FRAME_UNAVAILABLE;
     }
+    moonlink_native_capture_probe_result frame_result = MOONLINK_NATIVE_CAPTURE_READY;
+    if (inspect_texture) {
+      ID3D11Texture2D *desktop_texture = NULL;
+      result = IDXGIResource_QueryInterface(
+        desktop_resource,
+        &IID_ID3D11Texture2D,
+        (void **)&desktop_texture
+      );
+      if (FAILED(result) || desktop_texture == NULL) {
+        frame_result = MOONLINK_NATIVE_CAPTURE_TEXTURE_UNAVAILABLE;
+      } else {
+        D3D11_TEXTURE2D_DESC description = { 0 };
+        ID3D11Texture2D_GetDesc(desktop_texture, &description);
+        if (
+          description.Width == 0 ||
+          description.Height == 0 ||
+          description.Format != DXGI_FORMAT_B8G8R8A8_UNORM
+        ) {
+          frame_result = MOONLINK_NATIVE_CAPTURE_TEXTURE_UNAVAILABLE;
+        }
+        ID3D11Texture2D_Release(desktop_texture);
+      }
+    }
     IDXGIResource_Release(desktop_resource);
     result = IDXGIOutputDuplication_ReleaseFrame(duplication);
-    if (FAILED(result)) {
+    if (FAILED(result) || frame_result != MOONLINK_NATIVE_CAPTURE_READY) {
       IDXGIOutputDuplication_Release(duplication);
       IDXGIOutput1_Release(output1);
       IDXGIOutput_Release(output);
@@ -180,7 +196,7 @@ static moonlink_native_capture_probe_result moonlink_native_desktop_probe(
       IDXGIDevice_Release(dxgi_device);
       ID3D11DeviceContext_Release(device_context);
       ID3D11Device_Release(device);
-      return MOONLINK_NATIVE_CAPTURE_FRAME_UNAVAILABLE;
+      return FAILED(result) ? MOONLINK_NATIVE_CAPTURE_FRAME_UNAVAILABLE : frame_result;
     }
   }
 
@@ -197,13 +213,17 @@ static moonlink_native_capture_probe_result moonlink_native_desktop_probe(
 moonlink_native_capture_probe_result moonlink_native_desktop_duplication_probe(
   void
 ) {
-  return moonlink_native_desktop_probe(FALSE);
+  return moonlink_native_desktop_probe(FALSE, FALSE);
 }
 
 moonlink_native_capture_probe_result moonlink_native_desktop_frame_acquire_probe(
   void
 ) {
-  return moonlink_native_desktop_probe(TRUE);
+  return moonlink_native_desktop_probe(TRUE, FALSE);
+}
+
+moonlink_native_capture_probe_result moonlink_native_desktop_texture_probe(void) {
+  return moonlink_native_desktop_probe(TRUE, TRUE);
 }
 
 moonlink_native_viewer_probe_result moonlink_native_d3d_viewer_probe(void) {
@@ -812,4 +832,399 @@ int moonlink_native_h264_hardware_available(void) {
 
 int moonlink_native_input_allowed(moonlink_native_session_state state) {
   return state == MOONLINK_NATIVE_CONNECTED || state == MOONLINK_NATIVE_DEGRADED;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Capture session (ABI v2)
+   ══════════════════════════════════════════════════════════════════════ */
+
+static void moonlink_capture_bgra_to_nv12(
+  const uint8_t *bgra,
+  int bgra_pitch,
+  uint8_t *nv12,
+  int width,
+  int height,
+  int stride_y,
+  int stride_uv
+) {
+  uint8_t *y_plane = nv12;
+  uint8_t *uv_plane = nv12 + stride_y * height;
+
+  for (int row = 0; row < height; row += 1) {
+    const uint8_t *src_row = bgra + row * bgra_pitch;
+    uint8_t *y_row = y_plane + row * stride_y;
+
+    for (int col = 0; col < width; col += 1) {
+      const uint8_t *pixel = src_row + col * 4;
+      const int b = pixel[0];
+      const int g = pixel[1];
+      const int r = pixel[2];
+
+      int y = (66 * r + 129 * g + 25 * b + 128) >> 8;
+      y += 16;
+      if (y < 0) y = 0;
+      if (y > 255) y = 255;
+      y_row[col] = (uint8_t)y;
+    }
+  }
+
+  for (int row = 0; row < height; row += 2) {
+    const uint8_t *src_row_0 = bgra + row * bgra_pitch;
+    const uint8_t *src_row_1 = bgra + (row + 1) * bgra_pitch;
+    uint8_t *uv_row = uv_plane + (row / 2) * stride_uv;
+
+    for (int col = 0; col < width; col += 2) {
+      const uint8_t *p00 = src_row_0 + col * 4;
+      const uint8_t *p10 = src_row_0 + (col + 1) * 4;
+      const uint8_t *p01 = src_row_1 + col * 4;
+      const uint8_t *p11 = src_row_1 + (col + 1) * 4;
+
+      const int r = (p00[2] + p10[2] + p01[2] + p11[2]) / 4;
+      const int g = (p00[1] + p10[1] + p01[1] + p11[1]) / 4;
+      const int b = (p00[0] + p10[0] + p01[0] + p11[0]) / 4;
+
+      int u = (-38 * r - 74 * g + 112 * b + 128) >> 8;
+      u += 128;
+      if (u < 0) u = 0;
+      if (u > 255) u = 255;
+
+      int v = (112 * r - 94 * g - 18 * b + 128) >> 8;
+      v += 128;
+      if (v < 0) v = 0;
+      if (v > 255) v = 255;
+
+      uv_row[col] = (uint8_t)u;
+      uv_row[col + 1] = (uint8_t)v;
+    }
+  }
+}
+
+moonlink_native_result moonlink_capture_create(
+  const moonlink_capture_config *config,
+  moonlink_capture_handle *out_handle
+) {
+  if (config == NULL || out_handle == NULL) {
+    return MOONLINK_RESULT_INVALID_HANDLE;
+  }
+  *out_handle = NULL;
+
+  struct moonlink_capture_session *session = NULL;
+  IDXGIDevice *dxgi_device = NULL;
+  IDXGIAdapter *adapter = NULL;
+  IDXGIOutput *output = NULL;
+  IDXGIOutput1 *output1 = NULL;
+  moonlink_native_result result_code = MOONLINK_RESULT_OK;
+
+  session = (struct moonlink_capture_session *)calloc(
+    1,
+    sizeof(struct moonlink_capture_session)
+  );
+  if (session == NULL) {
+    return MOONLINK_RESULT_OUT_OF_MEMORY;
+  }
+
+  HRESULT hr = D3D11CreateDevice(
+    NULL,
+    D3D_DRIVER_TYPE_HARDWARE,
+    NULL,
+    0,
+    NULL,
+    0,
+    D3D11_SDK_VERSION,
+    &session->device,
+    NULL,
+    &session->device_context
+  );
+  if (FAILED(hr)) {
+    result_code = MOONLINK_RESULT_DEVICE_UNAVAILABLE;
+    goto cleanup;
+  }
+
+  hr = ID3D11Device_QueryInterface(
+    session->device,
+    &IID_IDXGIDevice,
+    (void **)&dxgi_device
+  );
+  if (FAILED(hr)) {
+    result_code = MOONLINK_RESULT_DEVICE_UNAVAILABLE;
+    goto cleanup;
+  }
+
+  hr = IDXGIDevice_GetAdapter(dxgi_device, &adapter);
+  if (FAILED(hr)) {
+    result_code = MOONLINK_RESULT_DEVICE_UNAVAILABLE;
+    goto cleanup;
+  }
+
+  hr = IDXGIAdapter_EnumOutputs(adapter, config->output_index, &output);
+  if (FAILED(hr)) {
+    result_code = MOONLINK_RESULT_DEVICE_UNAVAILABLE;
+    goto cleanup;
+  }
+
+  hr = IDXGIOutput_QueryInterface(
+    output,
+    &IID_IDXGIOutput1,
+    (void **)&output1
+  );
+  if (FAILED(hr)) {
+    result_code = MOONLINK_RESULT_DEVICE_UNAVAILABLE;
+    goto cleanup;
+  }
+
+  hr = IDXGIOutput1_DuplicateOutput(
+    output1,
+    (IUnknown *)session->device,
+    &session->duplication
+  );
+  if (FAILED(hr)) {
+    result_code = MOONLINK_RESULT_DEVICE_UNAVAILABLE;
+    goto cleanup;
+  }
+
+  DXGI_OUTPUT_DESC output_desc = { 0 };
+  hr = IDXGIOutput_GetDesc(output, &output_desc);
+  if (FAILED(hr)) {
+    result_code = MOONLINK_RESULT_INTERNAL_ERROR;
+    goto cleanup;
+  }
+
+  const int native_width = output_desc.DesktopCoordinates.right -
+    output_desc.DesktopCoordinates.left;
+  const int native_height = output_desc.DesktopCoordinates.bottom -
+    output_desc.DesktopCoordinates.top;
+
+  session->width = (config->target_width > 0) ? config->target_width : native_width;
+  session->height = (config->target_height > 0) ? config->target_height : native_height;
+  session->stride_y = session->width;
+  session->stride_uv = session->width;
+
+  D3D11_TEXTURE2D_DESC staging_desc = { 0 };
+  staging_desc.Width = (UINT)session->width;
+  staging_desc.Height = (UINT)session->height;
+  staging_desc.MipLevels = 1;
+  staging_desc.ArraySize = 1;
+  staging_desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+  staging_desc.SampleDesc.Count = 1;
+  staging_desc.Usage = D3D11_USAGE_STAGING;
+  staging_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+
+  hr = ID3D11Device_CreateTexture2D(
+    session->device,
+    &staging_desc,
+    NULL,
+    &session->staging_texture
+  );
+  if (FAILED(hr)) {
+    result_code = MOONLINK_RESULT_OUT_OF_MEMORY;
+    goto cleanup;
+  }
+
+  const size_t nv12_size = (size_t)session->width * session->height * 3 / 2;
+  session->nv12_buffer = (uint8_t *)malloc(nv12_size);
+  if (session->nv12_buffer == NULL) {
+    result_code = MOONLINK_RESULT_OUT_OF_MEMORY;
+    goto cleanup;
+  }
+
+  QueryPerformanceFrequency(&session->qpc_frequency);
+  session->stopped = FALSE;
+
+  *out_handle = session;
+  session = NULL;
+
+cleanup:
+  if (output1 != NULL) {
+    IDXGIOutput1_Release(output1);
+  }
+  if (output != NULL) {
+    IDXGIOutput_Release(output);
+  }
+  if (adapter != NULL) {
+    IDXGIAdapter_Release(adapter);
+  }
+  if (dxgi_device != NULL) {
+    IDXGIDevice_Release(dxgi_device);
+  }
+  if (session != NULL) {
+    if (session->nv12_buffer != NULL) {
+      free(session->nv12_buffer);
+    }
+    if (session->staging_texture != NULL) {
+      ID3D11Texture2D_Release(session->staging_texture);
+    }
+    if (session->duplication != NULL) {
+      IDXGIOutputDuplication_Release(session->duplication);
+    }
+    if (session->device_context != NULL) {
+      ID3D11DeviceContext_Release(session->device_context);
+    }
+    if (session->device != NULL) {
+      ID3D11Device_Release(session->device);
+    }
+    free(session);
+  }
+  return result_code;
+}
+
+moonlink_native_result moonlink_capture_next_frame(
+  moonlink_capture_handle handle,
+  int timeout_ms,
+  const moonlink_captured_frame **out_frame
+) {
+  if (handle == NULL || out_frame == NULL) {
+    return MOONLINK_RESULT_INVALID_HANDLE;
+  }
+  *out_frame = NULL;
+
+  if (handle->stopped) {
+    return MOONLINK_RESULT_ALREADY_STOPPED;
+  }
+
+  DXGI_OUTDUPL_FRAME_INFO frame_info = { 0 };
+  IDXGIResource *desktop_resource = NULL;
+  ID3D11Texture2D *desktop_texture = NULL;
+  D3D11_MAPPED_SUBRESOURCE mapped = { 0 };
+  moonlink_native_result result_code = MOONLINK_RESULT_OK;
+
+  HRESULT hr = IDXGIOutputDuplication_AcquireNextFrame(
+    handle->duplication,
+    (UINT)timeout_ms,
+    &frame_info,
+    &desktop_resource
+  );
+  if (hr == DXGI_ERROR_WAIT_TIMEOUT) {
+    return MOONLINK_RESULT_TIMEOUT;
+  }
+  if (FAILED(hr)) {
+    return MOONLINK_RESULT_INTERNAL_ERROR;
+  }
+
+  hr = IDXGIResource_QueryInterface(
+    desktop_resource,
+    &IID_ID3D11Texture2D,
+    (void **)&desktop_texture
+  );
+  if (FAILED(hr)) {
+    result_code = MOONLINK_RESULT_INTERNAL_ERROR;
+    goto cleanup;
+  }
+
+  ID3D11DeviceContext_CopySubresourceRegion(
+    handle->device_context,
+    (ID3D11Resource *)handle->staging_texture,
+    0,
+    0,
+    0,
+    0,
+    (ID3D11Resource *)desktop_texture,
+    0,
+    NULL
+  );
+
+  hr = ID3D11DeviceContext_Map(
+    handle->device_context,
+    (ID3D11Resource *)handle->staging_texture,
+    0,
+    D3D11_MAP_READ,
+    0,
+    &mapped
+  );
+  if (FAILED(hr)) {
+    result_code = MOONLINK_RESULT_INTERNAL_ERROR;
+    goto cleanup;
+  }
+
+  moonlink_capture_bgra_to_nv12(
+    (const uint8_t *)mapped.pData,
+    (int)mapped.RowPitch,
+    handle->nv12_buffer,
+    handle->width,
+    handle->height,
+    handle->stride_y,
+    handle->stride_uv
+  );
+
+  ID3D11DeviceContext_Unmap(
+    handle->device_context,
+    (ID3D11Resource *)handle->staging_texture,
+    0
+  );
+  mapped.pData = NULL;
+
+  LARGE_INTEGER qpc_now = { 0 };
+  QueryPerformanceCounter(&qpc_now);
+  const int64_t timestamp_us = (int64_t)(
+    (double)qpc_now.QuadPart /
+    (double)handle->qpc_frequency.QuadPart *
+    1000000.0
+  );
+
+  handle->cached_frame.nv12_data = handle->nv12_buffer;
+  handle->cached_frame.width = handle->width;
+  handle->cached_frame.height = handle->height;
+  handle->cached_frame.stride_y = handle->stride_y;
+  handle->cached_frame.stride_uv = handle->stride_uv;
+  handle->cached_frame.timestamp_us = timestamp_us;
+
+  *out_frame = &handle->cached_frame;
+
+cleanup:
+  if (mapped.pData != NULL) {
+    ID3D11DeviceContext_Unmap(
+      handle->device_context,
+      (ID3D11Resource *)handle->staging_texture,
+      0
+    );
+  }
+  if (desktop_texture != NULL) {
+    ID3D11Texture2D_Release(desktop_texture);
+  }
+  if (desktop_resource != NULL) {
+    IDXGIResource_Release(desktop_resource);
+  }
+  IDXGIOutputDuplication_ReleaseFrame(handle->duplication);
+  return result_code;
+}
+
+moonlink_native_result moonlink_capture_stop(moonlink_capture_handle handle) {
+  if (handle == NULL) {
+    return MOONLINK_RESULT_INVALID_HANDLE;
+  }
+  if (handle->stopped) {
+    return MOONLINK_RESULT_ALREADY_STOPPED;
+  }
+  handle->stopped = TRUE;
+  if (handle->duplication != NULL) {
+    IDXGIOutputDuplication_Release(handle->duplication);
+    handle->duplication = NULL;
+  }
+  return MOONLINK_RESULT_OK;
+}
+
+moonlink_native_result moonlink_capture_destroy(moonlink_capture_handle handle) {
+  if (handle == NULL) {
+    return MOONLINK_RESULT_INVALID_HANDLE;
+  }
+  if (!handle->stopped) {
+    moonlink_capture_stop(handle);
+  }
+  if (handle->staging_texture != NULL) {
+    ID3D11Texture2D_Release(handle->staging_texture);
+    handle->staging_texture = NULL;
+  }
+  if (handle->device_context != NULL) {
+    ID3D11DeviceContext_Release(handle->device_context);
+    handle->device_context = NULL;
+  }
+  if (handle->device != NULL) {
+    ID3D11Device_Release(handle->device);
+    handle->device = NULL;
+  }
+  if (handle->nv12_buffer != NULL) {
+    free(handle->nv12_buffer);
+    handle->nv12_buffer = NULL;
+  }
+  free(handle);
+  return MOONLINK_RESULT_OK;
 }

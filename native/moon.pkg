@@ -5,11 +5,19 @@ import {
 supported_targets = "native"
 
 options(
-  "native-stub": [ "src/bridge.c" ],
+  "native-stub": [
+    "src/bridge.c",
+    "src/encoder_session.c",
+    "src/decoder_session.c",
+    "src/viewer_session.c",
+    "src/handle_table.c",
+    "src/signaling.c",
+    "src/h264_depacketizer.c",
+  ],
   link: {
     "native": {
-      "cc-flags": "/I native/include",
-      "stub-cc-flags": "/I native/include",
+      "cc-flags": "/I native/include /I native/src",
+      "stub-cc-flags": "/I native/include /I native/src",
       "cc-link-flags": "user32.lib d3d11.lib dxgi.lib dxguid.lib mfplat.lib mf.lib mfuuid.lib ole32.lib",
     },
   },

@@ -15,9 +15,9 @@ version = "0.1.0"
 
 readme = "README.md"
 
-repository = ""
+repository = "https://github.com/PingGuoMiaoMiao/moonlink.git"
 
-license = "Apache-2.0"
+license = "MIT"
 
 keywords = [ ]
 

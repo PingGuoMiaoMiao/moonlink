@@ -6,35 +6,58 @@ MoonBit 仅看到不透明句柄、固定宽度数值、字节数组和受控回
 
 原生桥通过 C ABI 提供采集、编码、传输、输入、查看与性能事件。句柄必须有明确创建、停止和释放路径；回调必须在会话结束后停止；任何输入执行都必须由已授权会话句柄守卫。
 
-## 当前 ABI：修订 1
+## ABI 修订 2
 
-`native/include/moonlink_native_bridge.h` 是当前唯一已实现的 C 头文件。它定义了 `moonlink_native_session_state`、`moonlink_native_bridge_abi_version` 和下列输入闸门与可行性探针；这些探针均为无状态调用，不创建可供 MoonBit 持有的会话资源。
+`native/include/moonlink_native_bridge.h` 是当前唯一已实现的 C 头文件。ABI v2 在保留全部 v1 探针的基础上，新增了五类会话级句柄 API 和一套整数句柄 FFI 层。
+
+### v1 探针（不变）
 
 | 符号 | 已验证的边界 |
 | --- | --- |
-| `moonlink_native_input_allowed` | 仅 `MOONLINK_NATIVE_CONNECTED` 与 `MOONLINK_NATIVE_DEGRADED` 返回允许值；等待确认和结束状态不可执行输入。 |
+| `moonlink_native_input_allowed` | 仅 `MOONLINK_NATIVE_CONNECTED` 与 `MOONLINK_NATIVE_DEGRADED` 返回允许值。 |
 | `moonlink_native_display_count` | 通过 `EnumDisplayMonitors` 统计可见显示器。 |
-| `moonlink_native_desktop_duplication_probe` | 创建硬件 D3D11 设备，对第一个 DXGI 输出调用 `IDXGIOutput1::DuplicateOutput` 后立即释放。它不采集或保存帧。 |
-| `moonlink_native_desktop_frame_acquire_probe` | 对第一个 DXGI 输出获取一帧、释放 `IDXGIResource` 和 `IDXGIOutputDuplication` 帧后返回。它不保存、编码、显示或发送像素。 |
-| `moonlink_native_d3d_viewer_probe` | 创建 1×1 原生窗口与 D3D11 交换链，清屏并 `Present` 后销毁。它不接收或呈现 H.264 帧。 |
-| `moonlink_native_h264_software_available` | 枚举并激活软件 H.264 Media Foundation 编码 MFT。 |
-| `moonlink_native_h264_software_encode_probe` | 枚举同步软件 H.264 MFT，以 1280×720、30fps、2,000,000 bit/s 的 H.264 输出类型和 NV12 输入类型对每个尝试的 MFT 驱动最多四个合成样本；调用方分配输出时使用 MFT 报告的 `cbAlignment`，成功激活后调用 `ShutdownObject`。仅当收到非空输出样本时返回允许值，并释放全部样本与 MFT。它不编码桌面帧，也不保存或发送输出字节。 |
-| `moonlink_native_h264_hardware_available` | 枚举并激活硬件 H.264 Media Foundation 编码 MFT。 |
+| `moonlink_native_desktop_duplication_probe` | 创建硬件 D3D11 设备，对第一个 DXGI 输出调用 `DuplicateOutput` 后立即释放。 |
+| `moonlink_native_desktop_frame_acquire_probe` | 获取一帧并释放后返回。 |
+| `moonlink_native_desktop_texture_probe` | 确认桌面帧暴露 BGRA D3D11 纹理。 |
+| `moonlink_native_d3d_viewer_probe` | 创建 1×1 窗口 + D3D11 交换链，清屏并 Present 后销毁。 |
+| `moonlink_native_h264_software_available` | 枚举并激活软件 H.264 MFT。 |
+| `moonlink_native_h264_software_encode_probe` | 以合成 NV12 样本驱动编码器，确认非空输出。 |
+| `moonlink_native_h264_hardware_available` | 枚举并激活硬件 H.264 MFT。 |
 
-`native/bridge_ffi.mbt` 是该头文件唯一的 MoonBit 封装：它以 `native/moon.pkg` 的 `native-stub` 构建 `src/bridge.c`，将 C 枚举映射为 `CaptureProbeResult` 和 `ViewerProbeResult`，将 H.264 探测映射为 `Bool`，并把 `core.SessionPhase` 显式转换为 C 会话状态。`core/` 不导入 `native/`，因此会话核心不依赖 Windows 类型或原生实现。
+### v2 会话句柄 API
 
-MoonBit 不会把包的 `cc-link-flags` 自动传递给导入它的可执行包。因此每个导入 `native/` 的 Windows 可执行包必须在自身 `moon.pkg` 显式链接 `user32.lib d3d11.lib dxgi.lib dxguid.lib mfplat.lib mf.lib mfuuid.lib ole32.lib`。`cmd/diagnostics` 是这一规则的最小可运行验证。
+每类会话遵循统一生命周期：`create → (use) → stop → destroy`。
 
-`native/tests/transport_loopback.c` 直接使用固定版本 libdatachannel 的 C API 验证本机 WebRTC 协商，不属于该头文件的已导出会话 ABI，也尚未由 MoonBit 调用。
+| 会话类型 | 创建 | 核心操作 | 停止/释放 |
+| --- | --- | --- | --- |
+| **Capture** | `moonlink_capture_create` | `moonlink_capture_next_frame`（阻塞等待桌面帧，BGRA→NV12 转换） | `capture_stop`, `capture_destroy` |
+| **Encoder** | `moonlink_encoder_create` | `moonlink_encoder_encode`（NV12→H.264，返回编码包数组） | `encoder_stop`, `encoder_destroy` |
+| **Transport** | `moonlink_transport_create` | `start`, `send_video`, `send_control`, SDP/candidate 交换 | `transport_stop`, `transport_destroy` |
+| **Decoder** | `moonlink_decoder_create` | `moonlink_decoder_decode`（H.264→BGRA） | `decoder_stop`, `decoder_destroy` |
+| **Viewer** | `moonlink_viewer_create` | `moonlink_viewer_present`（BGRA→D3D11 窗口），`pump_messages` | `viewer_stop`, `viewer_destroy` |
 
-该修订尚未暴露采集、编解码、传输、D3D 查看或遥测句柄。六类完整能力的句柄、回调线程和释放语义必须先由各自的可行性测试确定，再扩展此头文件和 MoonBit FFI 声明。
+### 整数句柄 FFI 层
 
-## 计划中的原生实现
+MoonBit 原生 FFI 仅支持值类型（Int、Bool）。`handle_table.c` 实现了 C 侧句柄表，将不透明指针映射为整数槽位索引（0 = 无效）。所有 `*_ffi` 后缀函数接受和返回整数句柄，供 `bridge_ffi.mbt` 直接调用。
 
-- 采集：单显示器 Windows 桌面采集。
-- 编码：H.264，优先硬件编码；不可用时 720p 30fps 软件回退。
-- 传输：`libdatachannel` 承载局域网 WebRTC 媒体与控制数据。
-- 查看：独立 D3D 窗口。
-- 输入：仅在被控端明确授权期间执行 Windows 输入操作。
+`bridge_ffi.mbt` 提供安全封装类型：`CaptureSession`、`EncoderSession`、`TransportSession`、`DecoderSession`、`ViewerSession`，以及 `NativeResult` 枚举。`core/` 不导入 `native/`，会话核心保持不依赖 Windows 类型。
 
-上述实现仍需在具备 MSVC 工具链的环境中分别构建和测试；在通过原生可行性门槛前，它们不是已交付能力。
+### 源文件结构
+
+| 文件 | 职责 |
+| --- | --- |
+| `src/bridge.c` | v1 探针 + 采集会话实现 |
+| `src/encoder_session.c` | H.264 编码会话（Media Foundation MFT） |
+| `src/decoder_session.c` | H.264 解码会话（Media Foundation Decoder MFT） |
+| `src/transport_session.c` | WebRTC 传输会话（libdatachannel），仅在 `MOONLINK_WITH_LIBDATACHANNEL=ON` 时编译 |
+| `src/viewer_session.c` | D3D11 查看器窗口会话 |
+| `src/handle_table.c` | 整数句柄表和 `*_ffi` 包装函数 |
+| `src/sessions_internal.h` | 内部结构定义（不对外暴露） |
+
+### 链接要求
+
+MoonBit 不会把包的 `cc-link-flags` 自动传递给导入它的可执行包。每个导入 `native/` 的 Windows 可执行包必须在自身 `moon.pkg` 显式链接 `user32.lib d3d11.lib dxgi.lib dxguid.lib mfplat.lib mf.lib mfuuid.lib ole32.lib`。`cmd/diagnostics` 是这一规则的最小可运行验证。
+
+### 传输依赖
+
+`transport_session.c` 依赖 libdatachannel v0.24.6（提交 d9617a5）。构建时需启用 `-DMOONLINK_WITH_LIBDATACHANNEL=ON` 并提供 OpenSSL 开发根目录。详见 `native/LIBDATACHANNEL_LOCK.md`。未启用时，传输相关 FFI 函数不可用。

@@ -16,8 +16,8 @@ fn viewer_probe_ready(result : @native.ViewerProbeResult) -> Bool {
 
 ///|
 fn main {
-  if @native.native_abi_version() != 1 {
-    println("MoonLink native diagnostics: ABI mismatch")
+  if @native.native_abi_version() != 2 {
+    println("MoonLink native diagnostics: ABI mismatch (expected v2)")
     return
   }
 
